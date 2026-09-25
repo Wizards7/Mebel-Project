@@ -1,0 +1,159 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Admin Users
+model Admin {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  phone        String?   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("admins")
+}
+
+// 2. Categories
+model Category {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  name        String    // e.g. "Спальные гарнитуры"
+  tajikName   String?   // e.g. "Гарнитурҳои хоб"
+  description String?
+  image       String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("categories")
+}
+
+// 3. Products
+model Product {
+  id                 String         @id @default(uuid())
+  slug               String         @unique
+  name               String
+  categoryId         String
+  category           Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  price              Float?         // null means "Нарх бо дархост"
+  currency           String         @default("сомонӣ")
+  size               String?        // Exact string (e.g. "320")
+  material           String?        // e.g. "MDF", "Чӯби табиӣ"
+  includedItems      String?        // Stored as JSON string array: ["Шкаф","Тумбочка","Комод","Диван"]
+  deliveryAvailable  Boolean        @default(true)
+  assemblyAvailable  Boolean        @default(true)
+  phone              String?        // Custom seller phone
+  featured           Boolean        @default(false)
+  status             String         @default("ACTIVE") // ACTIVE, HIDDEN, ARCHIVED
+  description        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  images             ProductImage[]
+  orderItems         OrderItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([slug])
+  @@map("products")
+}
+
+// 4. Product Images
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String   // /uploads/products/xyz.webp or remote URL
+  isMain    Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// 5. Clients (Aggregated by normalized phone)
+model Client {
+  id           String    @id @default(uuid())
+  phone        String    @unique // Normalized digits only
+  name         String
+  city         String?
+  address      String?
+  notes        String?
+  totalOrders  Int       @default(1)
+  lastOrderAt  DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  orders       Order[]
+
+  @@index([phone])
+  @@map("clients")
+}
+
+// 6. Orders
+model Order {
+  id          Int          @id @default(autoincrement()) // e.g. #1001, #1002
+  clientId    String
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  status      String       @default("NEW") // NEW, CONTACTED, CONFIRMED, DELIVERING, COMPLETED, CANCELLED
+  totalPrice  Float?       // null if on request
+  clientName  String       // Direct snapshot
+  clientPhone String       // Direct snapshot
+  city        String
+  address     String
+  comment     String?
+  adminNotes  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  items       OrderItem[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+// 7. Order Items (Historical Snapshot)
+model OrderItem {
+  id              String   @id @default(uuid())
+  orderId         Int
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName     String   // Historical name snapshot
+  productPrice    Float?   // Historical unit price snapshot
+  productSize     String?  // Historical size snapshot
+  productMaterial String?  // Historical material snapshot
+  quantity        Int      @default(1)
+  createdAt       DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// 8. Site Settings
+model Setting {
+  id             String   @id @default("default")
+  siteName       String   @default("Мебели Тоҷикистон")
+  tagline        String   @default("Мебели зебо, муосир ва бароҳат барои хонаи шумо")
+  phone          String   @default("111225554")
+  displayPhone   String   @default("+992 (11) 122-55-54")
+  whatsAppPhone  String   @default("992111225554")
+  address        String   @default("ш. Душанбе, хиёбони Рӯдакӣ, Маркази мебел «Хонаи Орзу»")
+  workingHours   String   @default("Ҳамарӯза: 08:00 – 20:00 (бе рӯзи истироҳат)")
+  deliveryText   String   @default("Доставка дар тамоми Тоҷикистон")
+  assemblyText   String   @default("Насб ва васли касбӣ дастрас аст")
+  updatedAt      DateTime @updatedAt
+
+  @@map("settings")
+}
