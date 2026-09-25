@@ -1,6 +1,8 @@
 import { MetadataRoute } from "next";
 import { getDbProducts, getDbCategories } from "@/lib/data-service";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://mebeli-tojikiston.tj";
   const [products, categories] = await Promise.all([

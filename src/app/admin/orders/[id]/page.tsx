@@ -17,6 +17,8 @@ import {
 import { formatPrice, formatPhone } from "@/lib/utils";
 import OrderStatusChanger from "./OrderStatusChanger";
 
+export const dynamic = "force-dynamic";
+
 interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -29,30 +31,35 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     notFound();
   }
 
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    include: {
-      client: {
-        include: {
-          orders: {
-            where: { id: { not: orderId } },
-            take: 5,
-            orderBy: { createdAt: "desc" },
+  let order: any = null;
+  try {
+    order = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        client: {
+          include: {
+            orders: {
+              where: { id: { not: orderId } },
+              take: 5,
+              orderBy: { createdAt: "desc" },
+            },
           },
         },
+        items: true,
       },
-      items: true,
-    },
-  });
+    });
+  } catch (err) {
+    console.error("Error fetching order:", err);
+  }
 
   if (!order) {
     notFound();
   }
 
   // Pre-fill WhatsApp link to client
-  const rawClientPhone = order.clientPhone.replace(/\D/g, "");
+  const rawClientPhone = (order.clientPhone || "").replace(/\D/g, "");
   const whatsAppClientLink = `https://wa.me/${rawClientPhone}?text=${encodeURIComponent(
-    `Салом, ${order.clientName}! Шумо аз сомонаи мо мебели «${order.items[0]?.productName || "мебел"}»-ро фармоиш дода будед (Фармоиш #${order.id}). Барои тасдиқи таҳвил муроҷиат намудем.`
+    `Салом, ${order.clientName}! Шумо аз сомонаи мо мебели «${order.items?.[0]?.productName || "мебел"}»-ро фармоиш дода будед (Фармоиш #${order.id}). Барои тасдиқи таҳвил муроҷиат намудем.`
   )}`;
 
   return (
@@ -111,7 +118,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             </h2>
 
             <div className="divide-y divide-stone-100">
-              {order.items.map((item) => (
+              {order.items?.map((item: any) => (
                 <div key={item.id} className="py-3.5 flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-base font-bold text-stone-900">
@@ -201,13 +208,13 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             </div>
 
             {/* Other orders by this client */}
-            {order.client.orders && order.client.orders.length > 0 && (
+            {order.client?.orders && order.client.orders.length > 0 && (
               <div className="pt-2">
                 <div className="text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
-                  Дигар фармоишҳои ин муштарӣ ({order.client.totalOrders} фармоиш):
+                  Дигар фармоишҳои ин муштарӣ ({order.client.totalOrders || order.client.orders.length} фармоиш):
                 </div>
                 <div className="space-y-1.5">
-                  {order.client.orders.map((otherOrder) => (
+                  {order.client.orders.map((otherOrder: any) => (
                     <Link
                       key={otherOrder.id}
                       href={`/admin/orders/${otherOrder.id}`}

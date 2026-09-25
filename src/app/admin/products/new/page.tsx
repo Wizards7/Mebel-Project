@@ -1,13 +1,31 @@
 import { db } from "@/lib/db";
+import { getDbCategories } from "@/lib/data-service";
 import ProductForm from "@/components/admin/ProductForm";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewProductPage() {
-  const categories = await db.category.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
+  let categories: any[] = [];
+  try {
+    categories = await db.category.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    });
+  } catch (err) {
+    console.error("Error loading categories in admin new product page:", err);
+    categories = (await getDbCategories()).map((c) => ({
+      id: c.id,
+      name: c.name,
+      tajikName: c.tajikName,
+      slug: c.slug,
+      isActive: true,
+      sortOrder: 0,
+      description: c.description,
+      image: c.image,
+    }));
+  }
 
   return (
     <div className="space-y-6">

@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { formatPrice, formatPhone } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 interface ClientDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -20,21 +22,26 @@ interface ClientDetailPageProps {
 export default async function ClientDetailPage({ params }: ClientDetailPageProps) {
   const { id } = await params;
 
-  const client = await db.client.findUnique({
-    where: { id },
-    include: {
-      orders: {
-        include: { items: true },
-        orderBy: { createdAt: "desc" },
+  let client: any = null;
+  try {
+    client = await db.client.findUnique({
+      where: { id },
+      include: {
+        orders: {
+          include: { items: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.error("Error fetching client:", err);
+  }
 
   if (!client) {
     notFound();
   }
 
-  const rawPhone = client.phone.replace(/\D/g, "");
+  const rawPhone = (client.phone || "").replace(/\D/g, "");
   const whatsAppClientLink = `https://wa.me/${rawPhone}?text=${encodeURIComponent(
     `Салом, ${client.name}! Мо аз маркази мебели «Мебели Тоҷикистон» муроҷиат мекунем.`
   )}`;
@@ -102,7 +109,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
 
           <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-100">
             <span className="text-xs text-stone-500 font-semibold block mb-0.5">Ҳамаи фармоишҳо:</span>
-            <div className="font-extrabold text-stone-900 text-lg font-display">{client.orders.length} фармоиш</div>
+            <div className="font-extrabold text-stone-900 text-lg font-display">{client.orders?.length || 0} фармоиш</div>
           </div>
         </div>
       </div>
@@ -117,7 +124,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
         </div>
 
         <div className="divide-y divide-stone-100">
-          {client.orders.map((order) => (
+          {client.orders?.map((order: any) => (
             <div key={order.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-stone-50/80 transition-colors">
               <div>
                 <div className="flex items-center gap-2.5">
@@ -132,7 +139,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                   Сана: {new Date(order.createdAt).toLocaleString("tg-TJ")} • Суроға: {order.city}, {order.address}
                 </div>
                 <div className="text-xs text-stone-700 mt-1">
-                  Маҳсулот: <b>{order.items.map((i) => `${i.productName} (${i.quantity} дона)`).join(", ")}</b>
+                  Маҳсулот: <b>{order.items?.map((i: any) => `${i.productName} (${i.quantity} дона)`).join(", ")}</b>
                 </div>
               </div>
 

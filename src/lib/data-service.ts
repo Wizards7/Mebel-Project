@@ -1,5 +1,8 @@
 import { db } from "@/lib/db";
 import { Product, Category, CategorySlug } from "@/types/product";
+import { products as staticProducts } from "@/data/products";
+import { categories as staticCategories } from "@/data/categories";
+import { siteConfig } from "@/data/siteConfig";
 
 // Helper to map DB product to frontend Product interface
 export function formatDbProduct(p: any): Product {
@@ -66,11 +69,22 @@ export async function getDbProducts(filter?: { categorySlug?: string; featuredOn
       orderBy: { createdAt: "desc" },
     });
 
-    return items.map(formatDbProduct);
+    if (items && items.length > 0) {
+      return items.map(formatDbProduct);
+    }
   } catch (error) {
-    console.error("Error fetching products from db:", error);
-    return [];
+    console.error("Error fetching products from db, using fallback data:", error);
   }
+
+  // Fallback to rich static dataset
+  let list = [...staticProducts];
+  if (filter?.featuredOnly) {
+    list = list.filter((p) => p.featured);
+  }
+  if (filter?.categorySlug && filter.categorySlug !== "all") {
+    list = list.filter((p) => p.category === filter.categorySlug);
+  }
+  return list;
 }
 
 export async function getDbProductBySlug(slug: string): Promise<Product | null> {
@@ -83,12 +97,16 @@ export async function getDbProductBySlug(slug: string): Promise<Product | null> 
       },
     });
 
-    if (!item || item.status === "ARCHIVED") return null;
-    return formatDbProduct(item);
+    if (item && item.status !== "ARCHIVED") {
+      return formatDbProduct(item);
+    }
   } catch (error) {
-    console.error("Error fetching product by slug:", error);
-    return null;
+    console.error("Error fetching product by slug from db, using fallback:", error);
   }
+
+  // Fallback to static product
+  const found = staticProducts.find((p) => p.slug === slug);
+  return found || null;
 }
 
 export async function getDbCategories(): Promise<Category[]> {
@@ -103,19 +121,25 @@ export async function getDbCategories(): Promise<Category[]> {
       },
     });
 
-    return cats.map((c) => ({
-      id: c.id,
-      slug: c.slug as CategorySlug,
-      name: c.name,
-      tajikName: c.tajikName || c.name,
-      description: c.description || "",
-      image: c.image || "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=1200",
-      itemCount: c._count.products,
-    }));
+    if (cats && cats.length > 0) {
+      return cats.map((c) => ({
+        id: c.id,
+        slug: c.slug as CategorySlug,
+        name: c.name,
+        tajikName: c.tajikName || c.name,
+        description: c.description || "",
+        image: c.image || "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=1200",
+        itemCount: c._count.products,
+      }));
+    }
   } catch (error) {
-    console.error("Error fetching categories from db:", error);
-    return [];
+    console.error("Error fetching categories from db, using fallback data:", error);
   }
+
+  return staticCategories.map((c) => ({
+    ...c,
+    itemCount: staticProducts.filter((p) => p.category === c.slug).length,
+  }));
 }
 
 export async function getDbSettings() {
@@ -123,9 +147,21 @@ export async function getDbSettings() {
     const setting = await db.setting.findUnique({
       where: { id: "default" },
     });
-    return setting;
+    if (setting) return setting;
   } catch (error) {
-    console.error("Error fetching settings from db:", error);
-    return null;
+    console.error("Error fetching settings from db, using default config:", error);
   }
+
+  return {
+    id: "default",
+    siteName: siteConfig.siteName,
+    tagline: siteConfig.tagline,
+    phone: siteConfig.defaultPhone,
+    displayPhone: siteConfig.displayPhone,
+    whatsAppPhone: siteConfig.whatsAppPhone,
+    address: siteConfig.addressFull,
+    workingHours: siteConfig.workingHours,
+    deliveryText: siteConfig.deliveryText,
+    assemblyText: "Насб ва васлкунӣ аз ҷониби устоҳои касбӣ",
+  };
 }
